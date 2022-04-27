@@ -1,7 +1,3 @@
-//
-// Created by blackdeer on 4/26/22.
-//
-
 #ifndef PIX2ASCII_UTILS_H
 #define PIX2ASCII_UTILS_H
 
