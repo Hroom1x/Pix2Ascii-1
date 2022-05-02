@@ -2,11 +2,11 @@
 #include <ncurses.h>
 #include <string.h>
 #include <unistd.h>
-#include <time.h>
+#include <sys/time.h>
 #include <stdlib.h>
-
-#define VIDEO_FRAMERATE 60
-#define FRAME_TIMING_SLEEP 1000000 / VIDEO_FRAMERATE
+#define VIDEO_FRAMERATE 50
+#define N_uSECONDS_IN_ONE_SEC 1000000
+#define FRAME_TIMING_SLEEP N_uSECONDS_IN_ONE_SEC / VIDEO_FRAMERATE
 #define COMMAND_BUFFER_SIZE 512
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
@@ -82,7 +82,7 @@ unsigned char average_chanel_intensity(const unsigned char *frame,
                                        unsigned long cur_pixel_row,  unsigned long cur_pixel_col,
                                        unsigned long row_step, unsigned long col_step) {
     process_block(frame, frame_width, cur_pixel_row, cur_pixel_col,
-                                      row_step,      col_step);
+                  row_step,      col_step);
     return (rgb[0] + rgb[1] + rgb[2]) / (row_step * col_step * 3);
 }
 
@@ -97,33 +97,32 @@ unsigned char yuv_intensity(const unsigned char *frame,
 }
 
 // Timer =============================================
-typedef struct timespec timespec;
+typedef struct timeval timeval;
 
-timespec startTime;
-uint64_t lastCallTimeMicros = 0;
+timeval startTime;
 
-timespec diff(timespec *start, timespec *end) {
-    timespec temp;
+timeval diff(timeval *start, timeval *end) {
+    timeval temp;
     temp.tv_sec = end->tv_sec - start->tv_sec;
-    if ((end->tv_nsec < start->tv_nsec)) {
+    if ((end->tv_usec < start->tv_usec)) {
         --temp.tv_sec;
-        temp.tv_nsec = 1000000000 + end->tv_nsec - start->tv_nsec;
+        temp.tv_usec = N_uSECONDS_IN_ONE_SEC + end->tv_usec - start->tv_usec;
     } else {
-        temp.tv_nsec = end->tv_nsec - start->tv_nsec;
+        temp.tv_usec = end->tv_usec - start->tv_usec;
     }
     return temp;
 }
 
 // total time elapsed from start
-uint64_t get_elapsed_time_from_start_micros(){
-    static timespec tmpTime;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &tmpTime);
-    timespec diffTime = diff(&startTime, &tmpTime);
-    return  ((uint64_t)diffTime.tv_sec*1000000000 + (uint64_t)diffTime.tv_nsec)/1000;
+uint64_t get_elapsed_time_from_start_us(){
+    static timeval tmpTime, diffTime;
+    gettimeofday(&tmpTime, NULL);
+    diffTime = diff(&startTime, &tmpTime);
+    return  (uint64_t)diffTime.tv_sec * N_uSECONDS_IN_ONE_SEC + (uint64_t)diffTime.tv_usec;
 }
 
 int set_timer() {
-    clock_gettime(CLOCK_MONOTONIC_RAW, &startTime);
+    gettimeofday(&startTime, NULL);
     return 0;
 }
 
@@ -143,8 +142,7 @@ void draw_frame(const unsigned char *frame,
                 region_intensity_t get_region_intensity) {
 
     static unsigned int new_n_available_rows, new_n_available_cols;
-    static unsigned int trimmed_height;
-    static unsigned int trimmed_width;
+    static unsigned int trimmed_height, trimmed_width;
     static unsigned int offset;
 
     getmaxyx(stdscr, new_n_available_rows, new_n_available_cols);
@@ -166,7 +164,7 @@ void draw_frame(const unsigned char *frame,
     for (cur_char_row=0, cur_pixel_row=0;
          cur_pixel_row < trimmed_height;
          ++cur_char_row,
-         cur_pixel_row += row_downscale_coef) {
+                 cur_pixel_row += row_downscale_coef) {
         move(cur_char_row, offset);
         for (cur_pixel_col=0;
              cur_pixel_col < trimmed_width;
@@ -186,11 +184,13 @@ void close_pipe(FILE *pipeline) {
     pclose(pipeline);
 }
 
-void free_space(unsigned char *frame, FILE *pipeline){
+void free_space(unsigned char *frame, FILE *or_source, FILE *pipeline, FILE *logs_file){
     free(frame);
+    close_pipe(or_source);
     close_pipe(pipeline);
+    fflush(logs_file);
+    fclose(logs_file);
 }
-
 
 #include <inttypes.h>
 int main(int argc, char *argv[]) {
@@ -268,11 +268,8 @@ int main(int argc, char *argv[]) {
 
     char command_buffer[COMMAND_BUFFER_SIZE];
     int n_chars_printed = 0;
-
-    sprintf(command_buffer, "ffplay %s -hide_banner -loglevel error", filepath);
-    popen(command_buffer, "r");
-    usleep(50000);
     unsigned int FRAME_WIDTH = 1280, FRAME_HEIGHT = 720;
+    FILE *original_source = NULL;
     // obtaining an interface with ffmpeg
     if (reading_type == SOURCE_CAMERA) {
         n_chars_printed = sprintf(command_buffer, "ffmpeg -hide_banner -loglevel error "
@@ -304,7 +301,6 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Error obtaining input resolution! Width/height not found\n");
             return -1;
         }
-
         n_chars_printed = sprintf(command_buffer, "ffmpeg -i %s -f image2pipe -hide_banner -loglevel error "
                                                   "-vf fps=%d -vcodec rawvideo -pix_fmt rgb24 -",
                                   filepath, VIDEO_FRAMERATE);
@@ -325,50 +321,99 @@ int main(int argc, char *argv[]) {
     }
 
     unsigned char *frame = malloc(sizeof(char) * FRAME_HEIGHT * FRAME_WIDTH * 3);
-    unsigned int TOTAL_READ_SIZE = (FRAME_WIDTH * FRAME_HEIGHT * 3);
+    uint64_t TOTAL_READ_SIZE = (FRAME_WIDTH * FRAME_HEIGHT * 3);
 
     initscr();
     curs_set(0);
 
     uint64_t n_read_items;  // n bytes read from pipe
-    uint64_t current_frame_number = 0;
-    uint64_t total_elapsed_time;
-    uint64_t sleep_time;
-    uint64_t time_current_frame_number;
-    uint64_t frame_timing_sleep = FRAME_TIMING_SLEEP;
+    uint64_t current_frame_index = 0;
+    uint64_t next_frame_index_measured_by_time;
+    int64_t desynch, i;
+
+    uint64_t total_elapsed_time, last_total_elapsed_time;
+    uint64_t frame_timing_sleep = FRAME_TIMING_SLEEP;  // uint64_t int division doesn't work with operand of other type
+    uint64_t usecs_per_frame=0, sleep_time;
+
+    total_elapsed_time = get_elapsed_time_from_start_us();
+
+    FILE *logs = fopen("Logs.txt", "w");
+
+    // ==========
+    FILE *a = fopen("StartIndicator", "w");
+    assert(a);
+    fclose(a);
+    sprintf(command_buffer, "FFREPORT=file=StartIndicator:level=32 ffplay %s -hide_banner -loglevel error -nostats -vf showinfo", filepath);
+    original_source = popen(command_buffer, "r");
+
+#include <sys/stat.h>
+#include <errno.h>
+    struct stat st;
+    while (1) {
+        stat("./StartIndicator", &st);
+        assert(errno == 0);
+        long t = st.st_size;
+        if ((t >= strlen(filepath)) && (t - strlen(filepath) * sizeof(char)) > 600)
+            break;
+    }
+    // ==========
+    command_buffer[0] = '\0';
 
     set_timer();
-    while ((n_read_items = fread(frame, 1, TOTAL_READ_SIZE, pipein))) {
+    while ((n_read_items = fread(frame, sizeof(char), TOTAL_READ_SIZE, pipein)) || !feof(pipein)) {
         if (n_read_items < TOTAL_READ_SIZE) {
+            total_elapsed_time = get_elapsed_time_from_start_us();
+            sleep_time = frame_timing_sleep - (total_elapsed_time % frame_timing_sleep);
+            usleep(sleep_time);
             continue;
         }
+        ++current_frame_index;  // current_frame_index is incremented because of fread()
         draw_frame(frame, FRAME_WIDTH, FRAME_HEIGHT, char_set, max_char_set_index, grayscale_method);
+        fprintf(logs, "%s\n", command_buffer);
 
-        // main frames sync
-        total_elapsed_time = get_elapsed_time_from_start_micros();
-        time_current_frame_number = total_elapsed_time / frame_timing_sleep;
-
-        // debug info
-        // EL - elapsed time from start; FN - current Frame Number;
-        // TFN - current Frame Number measured by elapsed time
-        printw("\nEL:%" PRIu64 "|FN:%" PRIu64 "|TFN:%" PRIu64,
-               total_elapsed_time, current_frame_number, time_current_frame_number);
-
-        if ((time_current_frame_number > current_frame_number)) {
-            fseek(pipein, TOTAL_READ_SIZE * (time_current_frame_number - current_frame_number), SEEK_CUR);
-            current_frame_number = time_current_frame_number;
-        } else if (time_current_frame_number < current_frame_number) {
-            continue;
-        }
-        ++current_frame_number;
-
-        // additional sync
-        total_elapsed_time = get_elapsed_time_from_start_micros();
+        last_total_elapsed_time = total_elapsed_time;
+        total_elapsed_time = get_elapsed_time_from_start_us();
+        usecs_per_frame  = total_elapsed_time / current_frame_index + (total_elapsed_time % current_frame_index !=0);
         sleep_time = frame_timing_sleep - (total_elapsed_time % frame_timing_sleep);
+        next_frame_index_measured_by_time =  // ceil(total_elapsed_time / frame_timing_sleep)
+                total_elapsed_time / frame_timing_sleep + (total_elapsed_time % frame_timing_sleep != 0);
+        desynch = next_frame_index_measured_by_time - current_frame_index;
+        // debug info
+        // EL uS    - elapsed time (in microseconds) from the start;
+        // EL S     - elapsed time (in seconds) from the start;
+        // FI       - current Frame Index;
+        // TFI      - current Frame Index measured by elapsed time;
+        // uSPF     - micro (u) Seconds Per Frame (Canonical value);
+        // Cur uSPF - micro (u) Seconds Per Frame (current);
+        // Avg uSPF - micro (u) Seconds Per Frame (Avg);
+        // FPS      - Frames Per Second;
+
+        sprintf(command_buffer,
+                "EL uS:%10" PRIu64 "|EL S:%8.2Lf|FI:%5" PRIu64 "|TFI:%5" PRIu64 "|TFI - FI:%2" PRId64
+        "|uSPF:%8d|Cur uSPF:%8" PRIu64 "|Avg uSPF:%8" PRIu64 "|FPS:%8Lf",
+                total_elapsed_time,
+                (long double) total_elapsed_time / N_uSECONDS_IN_ONE_SEC,
+                current_frame_index,
+                next_frame_index_measured_by_time,
+                desynch,
+                FRAME_TIMING_SLEEP,
+                total_elapsed_time - last_total_elapsed_time,
+                usecs_per_frame,
+                current_frame_index / ((long double) total_elapsed_time / N_uSECONDS_IN_ONE_SEC));
+        printw("\n%s\n", command_buffer);
+
         usleep(sleep_time);
+        if (next_frame_index_measured_by_time > current_frame_index) {
+            for (i=0; i < desynch; ++i)
+                fread(frame, sizeof(char), TOTAL_READ_SIZE, pipein);
+            current_frame_index = next_frame_index_measured_by_time;
+        } else if (next_frame_index_measured_by_time < current_frame_index) {
+            usleep((current_frame_index - next_frame_index_measured_by_time) * FRAME_TIMING_SLEEP);
+        }
     }
     getchar();
-    free_space(frame, pipein);
     endwin();
+    printf("END\n");
+    free_space(frame, original_source, pipein, logs);
     return 0;
 }
