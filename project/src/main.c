@@ -6,7 +6,6 @@
 #include <assert.h>
 #include <time.h>
 #include <inttypes.h>
-#include <signal.h>
 
 #include "frame_utils.h"
 #include "timestamps.h"
@@ -42,13 +41,44 @@ void free_space(unsigned char *video_frame, FILE *or_source, FILE *pipeline, FIL
     fclose(logs_file);
 }
 
-static void finish(int sig);
+void set_color_pairs() {
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 7; j++) {
+            for (int k = 0; k < 6; k++) {
+                init_color(i*42 + j*6 + k + 1, i * 200, j * 166, k * 200);
+                init_pair(i*42 + j*6 + k + 1, i*42 + j*6 + k + 1, COLOR_BLACK);
+                // printf("(%d, %d, %d)\n", i * 194, j * 163, k * 194);
+            }
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Bad number of arguments!\n");
         return -1;
     }
+    //------------------------//------------------------//------------------------
+    // initscr();
+    // start_color();
+    // set_color_pairs();
+    // for (int i = 0; i < 6; i++) {
+    //     for (int j = 0; j < 7; j++) {
+    //         for (int k = 0; k < 6; k++) {
+    //             // 1000 / 6 == 166, 1000 / 7 == 142
+    //             attron(COLOR_PAIR(i*42 + j*6 + k + 1));
+    //             addch('a');
+    //             attroff(COLOR_PAIR(i*42 + j*6 + k + 1));
+    //             refresh();
+    //         }
+    //     }
+    // }
+    // getch();
+    // printf("\nEND");
+    // refresh();
+    // endwin();
+    // return -1;
+    //------------------------//------------------------//------------------------
 
     // flags:
     // -f <Media path>
@@ -258,7 +288,13 @@ int main(int argc, char *argv[]) {
     initscr();
     curs_set(0);
     total_elapsed_time = get_elapsed_time_from_start_us(startTime);
-    (void) signal(SIGINT, finish);  // start handling signals
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    start_color();
+    set_color_pairs();
+    // init_color(10, 500, 10, 500);
+    // init_pair(1, 10, COLOR_BLACK);
+    // attron(COLOR_PAIR(1));
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     while ((n_read_items = fread(video_frame, sizeof(char), TOTAL_READ_SIZE, pipein)) || !feof(pipein)) {
         if (n_read_items < TOTAL_READ_SIZE) {
             total_elapsed_time = get_elapsed_time_from_start_us(startTime);
@@ -283,8 +319,9 @@ int main(int argc, char *argv[]) {
             clear();
         }
         // ASCII frame preparation
-        draw_frame(video_frame, FRAME_WIDTH, trimmed_height, trimmed_width, row_downscale_coef, col_downscale_coef,
-                   left_border_indent, char_set, max_char_set_index, grayscale_method);
+        draw_color_frame(video_frame, FRAME_WIDTH, trimmed_height, trimmed_width, row_downscale_coef,
+                         col_downscale_coef, left_border_indent, char_set, max_char_set_index,
+                         grayscale_method);
         // ASCII frame drawing
         refresh();
 
@@ -338,14 +375,4 @@ int main(int argc, char *argv[]) {
     printf("END\n");
     free_space(video_frame, original_source, pipein, logs);
     return 0;
-}
-
-static void finish(int sig)
-{
-    getchar();
-    endwin();
-
-    printf("Terminated\n");
-
-    _exit(0);
 }

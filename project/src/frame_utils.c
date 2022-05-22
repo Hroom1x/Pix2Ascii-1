@@ -55,10 +55,9 @@ unsigned char average_chanel_intensity(const unsigned char *video_frame,
                                        unsigned long row_step, unsigned long col_step) {
     unsigned int r, g, b;
     process_block(video_frame, frame_width, cur_pixel_row, cur_pixel_col,
-                  row_step,      col_step, &r, &g, &b);
+                  row_step, col_step, &r, &g, &b);
     return (r + g + b) / (row_step * col_step * 3);
 }
-
 
 unsigned char yuv_intensity(const unsigned char *video_frame,
                             unsigned int frame_width,
@@ -70,7 +69,6 @@ unsigned char yuv_intensity(const unsigned char *video_frame,
     double current_block_intensity = (r * 0.299 + 0.587 * g + 0.114 * b) / (row_step * col_step * 3);
     return (unsigned char) MIN(current_block_intensity, 255);
 }
-
 
 void draw_frame(const unsigned char *video_frame,
                 unsigned int frame_width,
@@ -95,4 +93,42 @@ void draw_frame(const unsigned char *video_frame,
                                                                 row_downscale_coef, col_downscale_coef),
                                            char_set, max_char_set_index));
     }
+}
+
+int get_color_index(unsigned int r, unsigned int g, unsigned int b, unsigned long step1, unsigned long step2) {
+    return (((r*7 + g)*6 + b)/51) / step1 / step2 + 2;
+}
+
+void draw_color_frame(const unsigned char *video_frame,
+                unsigned int frame_width,
+                unsigned int trimmed_height,
+                unsigned int trimmed_width,
+                unsigned int row_downscale_coef,
+                unsigned int col_downscale_coef,
+                unsigned int left_border_indent,
+                const char char_set[],
+                unsigned int max_char_set_index,
+                region_intensity_t get_region_intensity) {
+    unsigned int r, g, b;
+    for (unsigned int cur_char_row = 0, cur_pixel_row = 0;
+         cur_pixel_row < trimmed_height;
+         ++cur_char_row, cur_pixel_row += row_downscale_coef) {
+        move(cur_char_row, left_border_indent);
+        for (unsigned int cur_pixel_col = 0; cur_pixel_col < trimmed_width; cur_pixel_col += col_downscale_coef) {
+            // TODO: fix double process_block call (narrowing in get_region_intensity)
+            // 6 x 7 x 6
+            process_block(video_frame, frame_width, cur_pixel_row, cur_pixel_col,
+                          row_downscale_coef, col_downscale_coef, &r, &g, &b);
+            attron(COLOR_PAIR(get_color_index(r, g, b, row_downscale_coef, col_downscale_coef)));
+            addch(get_char_given_intensity(get_region_intensity(video_frame,
+                                                                frame_width,
+                                                                cur_pixel_row, cur_pixel_col,
+                                                                row_downscale_coef, col_downscale_coef),
+                                           char_set, max_char_set_index));
+            attroff(COLOR_PAIR(get_color_index(r, g, b, row_downscale_coef, col_downscale_coef)));
+        }
+    }
+    // process_block(video_frame, frame_width, 60, 20,
+    //               row_downscale_coef, col_downscale_coef, &r, &g, &b);
+    // printw("\n%d  (%d, %d)\n", get_color_index(r, g, b, row_downscale_coef, col_downscale_coef), r, g, b);
 }

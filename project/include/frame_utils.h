@@ -31,7 +31,15 @@ void draw_frame(const unsigned char *video_frame,
                 unsigned int max_char_set_index,
                 region_intensity_t get_region_intensity);
 
-
-
+void draw_color_frame(const unsigned char *video_frame,
+                      unsigned int frame_width,
+                      unsigned int trimmed_height,
+                      unsigned int trimmed_width,
+                      unsigned int row_downscale_coef,
+                      unsigned int col_downscale_coef,
+                      unsigned int left_border_indent,
+                      const char char_set[],
+                      unsigned int max_char_set_index,
+                      region_intensity_t get_region_intensity);
 
 #endif  // PROJECT_INCLUDE_FRAME_UTILS_H_
