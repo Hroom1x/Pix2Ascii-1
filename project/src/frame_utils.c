@@ -96,7 +96,7 @@ void draw_frame(const unsigned char *video_frame,
 }
 
 int get_color_index(unsigned int r, unsigned int g, unsigned int b, unsigned long step1, unsigned long step2) {
-    return (((r*7 + g)*6 + b)/51) / step1 / step2 + 2;
+    return r/step1/step2/51*42 + g/step1/step2/51*6 + b/step1/step2/51 + 1;
 }
 
 void draw_color_frame(const unsigned char *video_frame,
@@ -128,7 +128,6 @@ void draw_color_frame(const unsigned char *video_frame,
             attroff(COLOR_PAIR(get_color_index(r, g, b, row_downscale_coef, col_downscale_coef)));
         }
     }
-    // process_block(video_frame, frame_width, 60, 20,
-    //               row_downscale_coef, col_downscale_coef, &r, &g, &b);
-    // printw("\n%d  (%d, %d)\n", get_color_index(r, g, b, row_downscale_coef, col_downscale_coef), r, g, b);
+    process_block(video_frame, frame_width, 60, 40,
+                  row_downscale_coef, col_downscale_coef, &r, &g, &b);
 }

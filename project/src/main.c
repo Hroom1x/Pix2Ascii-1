@@ -47,7 +47,7 @@ void set_color_pairs() {
             for (int k = 0; k < 6; k++) {
                 init_color(i*42 + j*6 + k + 1, i * 200, j * 166, k * 200);
                 init_pair(i*42 + j*6 + k + 1, i*42 + j*6 + k + 1, COLOR_BLACK);
-                // printf("(%d, %d, %d)\n", i * 194, j * 163, k * 194);
+                // printw("(%d, %d, %d)\n", i * 194, j * 163, k * 194);
             }
         }
     }
@@ -58,27 +58,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Bad number of arguments!\n");
         return -1;
     }
-    //------------------------//------------------------//------------------------
-    // initscr();
-    // start_color();
-    // set_color_pairs();
-    // for (int i = 0; i < 6; i++) {
-    //     for (int j = 0; j < 7; j++) {
-    //         for (int k = 0; k < 6; k++) {
-    //             // 1000 / 6 == 166, 1000 / 7 == 142
-    //             attron(COLOR_PAIR(i*42 + j*6 + k + 1));
-    //             addch('a');
-    //             attroff(COLOR_PAIR(i*42 + j*6 + k + 1));
-    //             refresh();
-    //         }
-    //     }
-    // }
-    // getch();
-    // printf("\nEND");
-    // refresh();
-    // endwin();
-    // return -1;
-    //------------------------//------------------------//------------------------
 
     // flags:
     // -f <Media path>
