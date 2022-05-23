@@ -5,6 +5,15 @@
 
 #include "utils.h"
 
+#define RED_DEPTH 6
+#define GREEN_DEPTH 7
+#define BLUE_DEPTH 6
+#define RED_MULTIPLIER 42   // RED_DEPTH * GREEN_DEPTH
+#define GREEN_MULTIPLIER 6  // GREEN_DEPTH
+#define BLUE_MULTIPLIER 1
+#define COLOR_6_UNITS_MULTIPLIER (1000 / (6 - 1))
+#define COLOR_7_UNITS_MULTIPLIER (1000 / (7 - 1))
+
 unsigned char average_chanel_intensity(const unsigned char *video_frame,
                                        unsigned int frame_width,
                                        unsigned long cur_pixel_row,  unsigned long cur_pixel_col,

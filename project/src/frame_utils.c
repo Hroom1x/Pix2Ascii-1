@@ -95,8 +95,11 @@ void draw_frame(const unsigned char *video_frame,
     }
 }
 
-int get_color_index(unsigned int r, unsigned int g, unsigned int b, unsigned long step1, unsigned long step2) {
-    return r/step1/step2/51*42 + g/step1/step2/51*6 + b/step1/step2/51 + 1;
+int get_6x7x6_color_index(unsigned int r, unsigned int g, unsigned int b, unsigned long step1, unsigned long step2) {
+    // 51 = 255/(6-1)
+    // 42 = 255/(7-1)
+    // Keep multipliers in origin order!
+    return r/step1/step2/51*42 + g/step1/step2/42*6 + b/step1/step2/51 + 1;
 }
 
 void draw_color_frame(const unsigned char *video_frame,
@@ -116,18 +119,15 @@ void draw_color_frame(const unsigned char *video_frame,
         move(cur_char_row, left_border_indent);
         for (unsigned int cur_pixel_col = 0; cur_pixel_col < trimmed_width; cur_pixel_col += col_downscale_coef) {
             // TODO: fix double process_block call (narrowing in get_region_intensity)
-            // 6 x 7 x 6
             process_block(video_frame, frame_width, cur_pixel_row, cur_pixel_col,
                           row_downscale_coef, col_downscale_coef, &r, &g, &b);
-            attron(COLOR_PAIR(get_color_index(r, g, b, row_downscale_coef, col_downscale_coef)));
+            attron(COLOR_PAIR(get_6x7x6_color_index(r, g, b, row_downscale_coef, col_downscale_coef)));
             addch(get_char_given_intensity(get_region_intensity(video_frame,
                                                                 frame_width,
                                                                 cur_pixel_row, cur_pixel_col,
                                                                 row_downscale_coef, col_downscale_coef),
                                            char_set, max_char_set_index));
-            attroff(COLOR_PAIR(get_color_index(r, g, b, row_downscale_coef, col_downscale_coef)));
+            attroff(COLOR_PAIR(get_6x7x6_color_index(r, g, b, row_downscale_coef, col_downscale_coef)));
         }
     }
-    process_block(video_frame, frame_width, 60, 40,
-                  row_downscale_coef, col_downscale_coef, &r, &g, &b);
 }

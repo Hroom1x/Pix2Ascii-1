@@ -42,12 +42,14 @@ void free_space(unsigned char *video_frame, FILE *or_source, FILE *pipeline, FIL
 }
 
 void set_color_pairs() {
-    for (int i = 0; i < 6; i++) {
-        for (int j = 0; j < 7; j++) {
-            for (int k = 0; k < 6; k++) {
-                init_color(i*42 + j*6 + k + 1, i * 200, j * 166, k * 200);
-                init_pair(i*42 + j*6 + k + 1, i*42 + j*6 + k + 1, COLOR_BLACK);
-                // printw("(%d, %d, %d)\n", i * 194, j * 163, k * 194);
+    for (int r = 0; r < RED_DEPTH; r++) {
+        for (int g = 0; g < GREEN_DEPTH; g++) {
+            for (int b = 0; b < BLUE_DEPTH; b++) {
+                init_color(r * RED_MULTIPLIER + g * GREEN_MULTIPLIER + b * BLUE_MULTIPLIER + 1,
+                           r * COLOR_6_UNITS_MULTIPLIER, g * COLOR_7_UNITS_MULTIPLIER, b * COLOR_6_UNITS_MULTIPLIER);
+                init_pair(r * RED_MULTIPLIER + g * GREEN_MULTIPLIER + b * BLUE_MULTIPLIER + 1,
+                          r * RED_MULTIPLIER + g * GREEN_MULTIPLIER + b * BLUE_MULTIPLIER + 1,
+                          COLOR_BLACK);
             }
         }
     }
