@@ -1,9 +1,14 @@
 //
 // Created by blackdeer on 5/17/22.
 //
+#include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #include "videostream.h"
+#include "status_codes.h"
 
 #define COMMAND_BUFFER_SIZE 512
 static char command_buffer[COMMAND_BUFFER_SIZE];
@@ -17,32 +22,32 @@ int get_frame_data(const char *filepath, int *frame_width, int *frame_height) {
 
     if (n_chars_printed < 0) {
         fprintf(stderr, "Error obtaining input resolution!\n");
-        return -1;
+        return RESOLUTION_OBTAINING_ERROR;
     } else if (n_chars_printed >= COMMAND_BUFFER_SIZE) {
         fprintf(stderr, "Error obtaining input resolution! Query is too big!\n");
-        return -1;
+        return RESOLUTION_OBTAINING_ERROR;
     }
     FILE *image_data_pipe = popen(command_buffer, "r");
     if (!image_data_pipe) {
         fprintf(stderr, "Error obtaining input resolution! Couldn't get an interface with ffprobe!\n");
-        return -1;
+        return RESOLUTION_OBTAINING_ERROR;
     }
     // reading input resolution
     if (fscanf(image_data_pipe, "%d %d", frame_width, frame_height) != 2 ||
     fflush(image_data_pipe) || fclose(image_data_pipe)) {
         fprintf(stderr, "Error obtaining input resolution! Width/height not found\n");
-        return -1;
+        return RESOLUTION_OBTAINING_ERROR;
     }
-    return 0;
+    return SUCCESS;
 }
 
 
 FILE *get_camera_stream(int frame_width, int frame_height) {
     int n_chars_printed = snprintf(command_buffer, COMMAND_BUFFER_SIZE,
-                               "ffmpeg -hide_banner -loglevel error "
-                               "-f v4l2 -i /dev/video0 -f image2pipe "
-                               "-vf fps=%d -vf scale=%d:%d -vcodec rawvideo -pix_fmt rgb24 -",
-                               VIDEO_FRAMERATE, frame_width, frame_height);
+                                   "ffmpeg -hide_banner -loglevel error "
+                                   "-f v4l2 -i /dev/video0 -f image2pipe "
+                                   "-vf fps=%d -vf scale=%d:%d -vcodec rawvideo -pix_fmt rgb24 -",
+                                   VIDEO_FRAMERATE, frame_width, frame_height);
     if (n_chars_printed < 0) {
         fprintf(stderr, "Error setting up camera!\n");
         return NULL;
@@ -81,21 +86,27 @@ FILE *get_file_stream(const char *file_path, int n_stream_loops) {
     return video_stream;
 }
 
-int start_player(char *file_path, int n_stream_loops) {
+
+int start_player(char *file_path, int n_stream_loops, char *player_type) {
+    if (!player_type)
+        return SUCCESS;
+
     FILE *ffplay_log_file = NULL;
     FILE *tmp = NULL;
 
     snprintf(command_buffer, COMMAND_BUFFER_SIZE,
              "FFREPORT=file=StartIndicator:level=32 "
-             "ffplay -loop %d %s -hide_banner -loglevel error -nostats -vf showinfo -framedrop ",
-             n_stream_loops, file_path);
-
+             "ffplay %s -loop %d %s -hide_banner -loglevel error -nostats -vf showinfo -framedrop ",
+             player_type, n_stream_loops, file_path);
+    
     if (!(tmp = popen(command_buffer, "r"))) {
-        return 1;
+        fprintf(stderr, "Couldn't start player!");
+        return POPEN_ERROR;
     }
 
     if (!(ffplay_log_file = fopen("StartIndicator", "w+"))) {
-        return 1;
+        fprintf(stderr, "Couldn't open StartIndicator!");
+        return FOPEN_ERROR;
     }
 
     int brackets_count = 0;
@@ -106,7 +117,8 @@ int start_player(char *file_path, int n_stream_loops) {
 
             fclose(ffplay_log_file);
             if (!(ffplay_log_file = fopen("StartIndicator", "r"))) {
-                return 1;
+                fprintf(stderr, "Couldn't reopen StartIndicator!");
+                return FOPEN_ERROR;
             }
 
             fseek(ffplay_log_file, current_file_position, SEEK_SET);
@@ -116,5 +128,5 @@ int start_player(char *file_path, int n_stream_loops) {
     }
     fclose(ffplay_log_file);
 
-    return 0;
+    return SUCCESS;
 }

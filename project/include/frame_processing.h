@@ -5,28 +5,36 @@ typedef struct {
     unsigned char *video_frame;
     int width;
     int height;
-    int trimmed_width;
-    int trimmed_height;
-    int row_downscale_coef;
-    int col_downscale_coef;
-    int left_border_indent;
+    int aspect_ratio;
+    int trimmed_width;  // cached for draw_frame
+    int trimmed_height;  // cached for draw_frame
+    int triple_width;  // cached for convolve
 } frame_params_t;
 
-void process_block(const frame_params_t *frame_params,
-                   int cur_pixel_row,
-                   int cur_pixel_col,
-                   unsigned int *r, unsigned int *g, unsigned int *b);
+typedef int (*kernel_update_method)(double **kernel, int width, int height);
 
-typedef unsigned char (*region_intensity_t)(const frame_params_t *frame_params,
-                                            int cur_pixel_row,
-                                            int cur_pixel_col);
+int update_naive(double **kernel, int width, int height);
 
-unsigned char average_chanel_intensity(const frame_params_t *video_frame,
-                                       int cur_pixel_row,
-                                       int cur_pixel_col);
+int update_gaussian(double **kernel, int width, int height);
 
-unsigned char yuv_intensity(const frame_params_t *frame_params,
-                            int cur_pixel_row,
-                            int cur_pixel_col);
+typedef struct {
+    double *kernel;
+    int width;
+    int height;
+    int volume;  // cached for region_intensity_t: width * height * 3
+    kernel_update_method update_kernel;
+} kernel_params_t;
+
+void convolve(const frame_params_t *frame_params,
+              const kernel_params_t *kernel_params,
+              int cur_pixel_row,
+              int cur_pixel_col,
+              double *r, double *g, double *b);
+
+typedef unsigned char (*region_intensity_t)(double r, double g, double b);
+
+unsigned char average_chanel_intensity(double r, double g, double b);
+
+unsigned char yuv_intensity(double r, double g, double b);
 
 #endif  // PROJECT_INCLUDE_FRAME_UTILS_H_
