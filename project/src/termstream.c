@@ -120,11 +120,12 @@ void set_color_pairs() {
     init_pair(TEXT_COLOR_PAIR, WHITE_COLOR, BLACK_COLOR);
 }
 
-static int get_color_index(unsigned int r, unsigned int g, unsigned int b, unsigned long step1, unsigned long step2) {
+static int get_color_index(unsigned int r, unsigned int g, unsigned int b,
+                           unsigned long downscale_coef1, unsigned long downscale_coef2) {
     // Keep multipliers in origin order!
-    return r/step1/step2/DEPTH_6_CONVERT_DIV*RED_MULTIPLIER +
-    g/step1/step2/DEPTH_7_CONVERT_DIV*GREEN_MULTIPLIER +
-    b/step1/step2/DEPTH_6_CONVERT_DIV + 1;
+    return r / downscale_coef1 / downscale_coef2 / DEPTH_6_CONVERT_DIV * RED_MULTIPLIER +
+           g / downscale_coef1 / downscale_coef2 / DEPTH_7_CONVERT_DIV * GREEN_MULTIPLIER +
+           b / downscale_coef1 / downscale_coef2 / DEPTH_6_CONVERT_DIV + 1;
 }
 
 void draw_color_frame(frame_params_t *frame_params,
