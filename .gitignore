@@ -1,5 +1,4 @@
 *
-!project/**
 !.gitignore
 !Media
 !run_linters.sh

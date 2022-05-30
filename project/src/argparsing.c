@@ -32,7 +32,7 @@ int argparse(user_params_t *user_params, int argc, char *argv[]) {
     // -method [average | yuv] : grayscale conversion methods
     // --color : enable color support
     // -nl : loop video; -1 for infinite loop
-    // -player [0 - off; 1 - only video; 2 - only audio; 3 - video and audio]
+    // -player [0 - off; 1 - video support; 2 - audio support; 3 - video and audio]
     // -filter [naive | gauss]
     user_params->charset_params = charsets[CHARSET_OPTIMAL];
     user_params->ffmpeg_params.n_stream_loops = 0;
@@ -117,13 +117,13 @@ int argparse(user_params_t *user_params, int argc, char *argv[]) {
                 return FLAG_ERROR;
             }
 
-            if (!strcmp(argv[i + 1], "off")) {
+            if (!strcmp(argv[i + 1], "off") || !strcmp(argv[i + 1], "0")) {
                 user_params->ffmpeg_params.player_flag = player_flags[PLAYER_OFF];
-            } else if (!strcmp(argv[i + 1], "video")) {
+            } else if (!strcmp(argv[i + 1], "video") || !strcmp(argv[i + 1], "1")) {
                 user_params->ffmpeg_params.player_flag = player_flags[PLAYER_VIDEO];
-            } else if (!strcmp(argv[i + 1], "audio")) {
+            } else if (!strcmp(argv[i + 1], "audio") || !strcmp(argv[i + 1], "2")) {
                 user_params->ffmpeg_params.player_flag = player_flags[PLAYER_AUDIO];
-            } else if (!strcmp(argv[i + 1], "all")) {
+            } else if (!strcmp(argv[i + 1], "all") || !strcmp(argv[i + 1], "3")) {
                 user_params->ffmpeg_params.player_flag = player_flags[PLAYER_ALL];
             } else {
                 fprintf(stderr, "Invalid argument! Unsupported player type!\n");
