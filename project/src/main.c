@@ -114,13 +114,15 @@ int main(int argc, char *argv[]) {
         }
         ++frame_sync_info.frame_index;
 
-        if ((return_status = update_terminal_size(&frame_data, &kernel_data, &user_params.terminal_params)))
-            break;
+        if ((return_status = update_terminal_size(&frame_data, &kernel_data,
+                                                  &user_params.terminal_params))) { break; }
         draw_frame(&frame_data, &kernel_data, user_params.charset_params,
                    user_params.terminal_params.left_border_indent,
                    user_params.frame_processing_params.rgb_channels_processor,
                    symbol_display_method);
-        debug(&frame_sync_info, logs, symbol_display_method);
+        if (user_params.terminal_params.log_flag != 0) {
+            debug(&frame_sync_info, logs, symbol_display_method);
+        }
         // ASCII frame drawing
         prev_uS_elapsed = frame_sync_info.uS_elapsed;
         frame_sync_info.uS_elapsed = get_elapsed_time_from_start_us(startTime);

@@ -16,6 +16,7 @@ typedef struct {
     int left_border_indent;
     int max_width;
     int max_height;
+    int log_flag;
 } terminal_params_t;
 
 typedef struct {

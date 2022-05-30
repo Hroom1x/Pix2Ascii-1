@@ -58,7 +58,7 @@ void convolve(const frame_params_t *frame_params,
               const kernel_params_t *kernel_params,
               int cur_pixel_row,
               int cur_pixel_col,
-              double *r, double *g, double *b) {
+              int *r, int *g, int *b) {
     double local_r = 0, local_g = 0, local_b =0;
 
     int down_row = cur_pixel_row + kernel_params->width;

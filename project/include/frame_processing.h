@@ -29,7 +29,7 @@ void convolve(const frame_params_t *frame_params,
               const kernel_params_t *kernel_params,
               int cur_pixel_row,
               int cur_pixel_col,
-              double *r, double *g, double *b);
+              int *r, int *g, int *b);
 
 typedef unsigned char (*region_intensity_t)(double r, double g, double b);
 

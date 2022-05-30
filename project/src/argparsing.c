@@ -34,6 +34,7 @@ int argparse(user_params_t *user_params, int argc, char *argv[]) {
     // -nl : loop video; -1 for infinite loop
     // -player [0 - off; 1 - video support; 2 - audio support; 3 - video and audio]
     // -filter [naive | gauss]
+    // -log : enable logging
     user_params->charset_params = charsets[CHARSET_OPTIMAL];
     user_params->ffmpeg_params.n_stream_loops = 0;
     user_params->ffmpeg_params.player_flag = NULL;
@@ -43,6 +44,7 @@ int argparse(user_params_t *user_params, int argc, char *argv[]) {
     user_params->terminal_params.max_width = INT_MAX;
     user_params->terminal_params.max_height = INT_MAX;
     user_params->terminal_params.preserve_aspect_flag = 0;
+    user_params->terminal_params.log_flag = 0;
     for (int i=1; i<argc;) {
         if (argv[i][0] != '-') {
             fprintf(stderr, "Invalid argument! Value is given without a corresponding flag!\n");
@@ -174,6 +176,9 @@ int argparse(user_params_t *user_params, int argc, char *argv[]) {
                     "--color : colorize terminal\n"
                     "--keep-aspect: Enable aspect ratio");
             return HELP_FLAG;
+        } else if (!strcmp(&argv[i][1], "log")) {
+            user_params->terminal_params.log_flag = 1;
+            ++i;
         } else {
             fprintf(stderr, "Unknown flag!\n");
             return FLAG_ERROR;

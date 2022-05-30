@@ -157,7 +157,7 @@ void draw_frame(const frame_params_t *frame_params,
                 int left_border_indent,
                 region_intensity_t get_region_intensity,
                 display_method_t display_method) {
-    double r, g, b;
+    int r, g, b;
     static char displaying_symbol[2];
 
     for (int cur_char_row=0, cur_pixel_row=0;
